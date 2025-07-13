@@ -40,6 +40,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Firebase storage bucket not configured' }, { status: 500 });
     }
     
+    if (!process.env.OPENAI_API_KEY) {
+      console.error('OPENAI_API_KEY environment variable is not set');
+      return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
+    }
+    
     console.log('Using storage bucket:', process.env.FIREBASE_STORAGE_BUCKET);
     
     // Get the user session
@@ -93,75 +98,106 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Project data is required' }, { status: 400 });
     }
 
+    // Validate required project data
+    if (!projectData.name || !projectData.climateZone || !projectData.squareFootage) {
+      return NextResponse.json({ error: 'Missing required project data: name, climateZone, and squareFootage are required' }, { status: 400 });
+    }
+
     // Handle image upload if provided
     let imageUrl = '';
     if (imageFile) {
-      // Upload image to Firebase Storage using Admin SDK
-      console.log('Storage bucket:', process.env.FIREBASE_STORAGE_BUCKET);
-      const adminStorage = getStorage();
-      const bucket = adminStorage.bucket(process.env.FIREBASE_STORAGE_BUCKET!);
-      const imageBuffer = await imageFile.arrayBuffer();
-      const fileName = `projects/${userId}/${Date.now()}_${imageFile.name}`;
-      
-      console.log('Uploading file:', fileName);
-      const file = bucket.file(fileName);
-      await file.save(Buffer.from(imageBuffer), {
-        metadata: {
-          contentType: imageFile.type,
-        },
-      });
-      
-      console.log('File uploaded successfully, making public...');
-      // Make the file publicly accessible and get the URL
-      await file.makePublic();
-      imageUrl = `https://storage.googleapis.com/${process.env.FIREBASE_STORAGE_BUCKET}/${fileName}`;
-      console.log('Image URL:', imageUrl);
+      try {
+        // Upload image to Firebase Storage using Admin SDK
+        console.log('Storage bucket:', process.env.FIREBASE_STORAGE_BUCKET);
+        const adminStorage = getStorage();
+        const bucket = adminStorage.bucket(process.env.FIREBASE_STORAGE_BUCKET!);
+        const imageBuffer = await imageFile.arrayBuffer();
+        const fileName = `projects/${userId}/${Date.now()}_${imageFile.name}`;
+        
+        console.log('Uploading file:', fileName);
+        const file = bucket.file(fileName);
+        await file.save(Buffer.from(imageBuffer), {
+          metadata: {
+            contentType: imageFile.type,
+          },
+        });
+        
+        console.log('File uploaded successfully, making public...');
+        // Make the file publicly accessible and get the URL
+        await file.makePublic();
+        imageUrl = `https://storage.googleapis.com/${process.env.FIREBASE_STORAGE_BUCKET}/${fileName}`;
+        console.log('Image URL:', imageUrl);
+      } catch (uploadError) {
+        console.error('Error uploading image:', uploadError);
+        return NextResponse.json({ error: 'Failed to upload image to Firebase Storage' }, { status: 500 });
+      }
     }
 
     // Create project document in Firestore
     const projectDoc = await addDoc(collection(db, 'projects'), {
       userId: userId,
       name: projectData.name,
-      description: projectData.notes,
+      description: projectData.notes || '',
       status: 'draft',
       originalImage: imageUrl,
       climateZone: projectData.climateZone,
-      sunExposure: projectData.sunExposure,
+      sunExposure: projectData.sunExposure || 'full-sun',
       squareFootage: projectData.squareFootage,
-      designStyle: projectData.designStyle,
+      designStyle: projectData.designStyle || 'modern',
       budget: projectData.budget || 0,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
 
-    // Generate AI content
-    const designPrompt = `Create a professional landscape design proposal for a ${projectData.squareFootage} sq ft area with ${projectData.sunExposure} exposure in climate zone ${projectData.climateZone}. The design style should be ${projectData.designStyle}. ${projectData.notes ? `Additional requirements: ${projectData.notes}` : ''}
+    console.log('Project document created with ID:', projectDoc.id);
 
-Please provide:
-1. A detailed design thesis explaining the design approach and plant selections
-2. A comprehensive materials list with quantities and estimated costs
-3. Design recommendations for this specific climate and sun exposure
+    // Generate AI content with enhanced prompts
+    const designPrompt = `Create a comprehensive, professional landscape design proposal for a ${projectData.squareFootage} square foot area with ${projectData.sunExposure} exposure in climate zone ${projectData.climateZone}. The design style should be ${projectData.designStyle}. ${projectData.notes ? `Additional requirements: ${projectData.notes}` : ''}
 
-Make it sound professional and experienced, as if written by a landscape designer with 20+ years of experience.`;
+Please provide a detailed response that includes:
 
+1. **Design Philosophy**: Explain the overall design approach and how it addresses the specific site conditions
+2. **Plant Selection Strategy**: Detail the plant choices, including specific species that thrive in this climate zone and sun exposure
+3. **Hardscape Elements**: Describe any pathways, patios, retaining walls, or other structural elements
+4. **Materials List**: Provide a comprehensive list of materials with quantities and estimated costs
+5. **Maintenance Recommendations**: Include care instructions for the selected plants and hardscape elements
+6. **Seasonal Considerations**: Address how the design will look and function throughout the year
+
+Make the response sound professional and authoritative, as if written by a landscape designer with 20+ years of experience. Focus on practical, implementable solutions that will create a beautiful, functional, and sustainable landscape.`;
+
+    const imagePrompt = `Professional landscape design rendering of a ${projectData.designStyle} style garden for a ${projectData.squareFootage} square foot area with ${projectData.sunExposure} exposure in climate zone ${projectData.climateZone}. 
+
+Include:
+- Appropriate plants and trees for this climate and sun exposure
+- Hardscaping elements like pathways, patios, or retaining walls
+- Proper scale and perspective
+- Natural lighting and shadows
+- Professional landscape design visualization quality
+- Realistic materials and textures
+
+Style: High quality, photorealistic, professional landscape design rendering that looks like it was created by an experienced landscape architect.`;
+
+    console.log('Generating AI content...');
+    
     const [designResponse, imageResponse] = await Promise.all([
       openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
-            content: 'You are an experienced landscape designer creating professional proposals. Provide detailed, practical advice that sounds authoritative and knowledgeable.',
+            content: 'You are an experienced landscape designer with over 20 years of experience creating professional proposals. Provide detailed, practical advice that sounds authoritative and knowledgeable. Focus on creating beautiful, functional, and sustainable landscapes that work with the specific site conditions.',
           },
           {
             role: 'user',
             content: designPrompt,
           },
         ],
-        max_tokens: 1500,
+        max_tokens: 2000,
+        temperature: 0.7,
       }),
       openai.images.generate({
         model: 'dall-e-3',
-        prompt: `Professional landscape design rendering of a ${projectData.designStyle} style garden for a ${projectData.squareFootage} sq ft area with ${projectData.sunExposure} exposure. Include appropriate plants, hardscaping, and design elements. High quality, photorealistic, professional landscape design visualization.`,
+        prompt: imagePrompt,
         n: 1,
         size: '1024x1024',
         quality: 'standard',
@@ -171,9 +207,16 @@ Make it sound professional and experienced, as if written by a landscape designe
     const designThesis = designResponse.choices[0]?.message?.content || '';
     const generatedImages = imageResponse.data?.map(img => img.url || '') || [];
 
+    console.log('AI content generated successfully');
+    console.log('Design thesis length:', designThesis.length);
+    console.log('Generated images count:', generatedImages.length);
+
     // Parse materials list from AI response and extract costs
     const materialsList = parseMaterialsList(designThesis);
     const totalCost = materialsList.reduce((sum, material) => sum + material.totalPrice, 0);
+
+    console.log('Materials parsed:', materialsList.length, 'items');
+    console.log('Total cost calculated:', totalCost);
 
     // Update project document with generated content
     await updateDoc(doc(db, 'projects', projectDoc.id), {
@@ -185,12 +228,14 @@ Make it sound professional and experienced, as if written by a landscape designe
       updatedAt: serverTimestamp(),
     });
 
-    // Update project with generated content
+    console.log('Project updated with generated content');
+
+    // Return the complete project data
     const project = {
       id: projectDoc.id,
       userId: userId,
       name: projectData.name,
-      description: projectData.notes,
+      description: projectData.notes || '',
       status: 'completed',
       originalImage: imageUrl,
       generatedImages,
@@ -198,14 +243,15 @@ Make it sound professional and experienced, as if written by a landscape designe
       materialsList,
       totalCost,
       climateZone: projectData.climateZone,
-      sunExposure: projectData.sunExposure,
+      sunExposure: projectData.sunExposure || 'full-sun',
       squareFootage: projectData.squareFootage,
-      designStyle: projectData.designStyle,
+      designStyle: projectData.designStyle || 'modern',
       budget: projectData.budget || 0,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
+    console.log('Project creation completed successfully');
     return NextResponse.json(project);
   } catch (error) {
     console.error('Error creating project:', error);
@@ -253,31 +299,38 @@ Make it sound professional and experienced, as if written by a landscape designe
 }
 
 function parseMaterialsList(designThesis: string): Material[] {
-  // This is a simplified parser - in a real implementation, you'd want more sophisticated parsing
+  // Enhanced parser for better material extraction
   const materials = [];
   
   // Extract common landscape materials and estimate costs
   const materialPatterns = [
-    { name: 'Mulch', pattern: /mulch/gi, unitPrice: 3, quantity: '2 cubic yards' },
-    { name: 'Topsoil', pattern: /topsoil/gi, unitPrice: 25, quantity: '1 cubic yard' },
-    { name: 'Landscape Fabric', pattern: /fabric/gi, unitPrice: 0.5, quantity: '100 sq ft' },
-    { name: 'Decorative Stones', pattern: /stone/gi, unitPrice: 150, quantity: '1 ton' },
-    { name: 'Pavers', pattern: /paver/gi, unitPrice: 4, quantity: '1 sq ft' },
+    { name: 'Mulch', pattern: /mulch/gi, unitPrice: 3, quantity: '2 cubic yards', category: 'mulch' as const },
+    { name: 'Topsoil', pattern: /topsoil/gi, unitPrice: 25, quantity: '1 cubic yard', category: 'other' as const },
+    { name: 'Landscape Fabric', pattern: /fabric/gi, unitPrice: 0.5, quantity: '100 sq ft', category: 'other' as const },
+    { name: 'Decorative Stones', pattern: /stone/gi, unitPrice: 150, quantity: '1 ton', category: 'hardscape' as const },
+    { name: 'Pavers', pattern: /paver/gi, unitPrice: 4, quantity: '1 sq ft', category: 'hardscape' as const },
+    { name: 'Concrete', pattern: /concrete/gi, unitPrice: 120, quantity: '1 cubic yard', category: 'hardscape' as const },
+    { name: 'Gravel', pattern: /gravel/gi, unitPrice: 45, quantity: '1 ton', category: 'hardscape' as const },
+    { name: 'Shrubs', pattern: /shrub/gi, unitPrice: 25, quantity: '10 plants', category: 'plants' as const },
+    { name: 'Perennials', pattern: /perennial/gi, unitPrice: 15, quantity: '20 plants', category: 'plants' as const },
+    { name: 'Trees', pattern: /tree/gi, unitPrice: 150, quantity: '3 trees', category: 'plants' as const },
+    { name: 'Annuals', pattern: /annual/gi, unitPrice: 8, quantity: '30 plants', category: 'plants' as const },
+    { name: 'Grass Seed', pattern: /grass/gi, unitPrice: 25, quantity: '5 lbs', category: 'plants' as const },
   ];
 
-  materialPatterns.forEach(({ name, pattern, unitPrice, quantity }) => {
+  materialPatterns.forEach(({ name, pattern, unitPrice, quantity, category }) => {
     if (pattern.test(designThesis)) {
       materials.push({
         name,
         quantity,
         unitPrice,
         totalPrice: unitPrice,
-        category: (name.toLowerCase().includes('stone') || name.toLowerCase().includes('paver')) ? 'hardscape' as const : 'other' as const,
+        category,
       });
     }
   });
 
-  // Add some default plants if none were detected
+  // Add some default materials if none were detected
   if (materials.length === 0) {
     materials.push(
       {

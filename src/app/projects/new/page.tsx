@@ -10,6 +10,7 @@ export default function NewProject() {
   const { data: session } = useSession();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState<string>('');
   const [formData, setFormData] = useState<ProjectFormData>({
     name: '',
     climateZone: '',
@@ -41,6 +42,7 @@ export default function NewProject() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setLoadingStep('Uploading image and creating project...');
 
     try {
       console.log('Form submission started');
@@ -86,7 +88,12 @@ export default function NewProject() {
         try {
           const project = await response.json();
           console.log('Project created:', project);
-          router.push(`/projects/${project.id}`);
+          
+          setLoadingStep('Project created successfully! Redirecting...');
+          // Show success message before redirecting
+          setTimeout(() => {
+            router.push(`/projects/${project.id}`);
+          }, 1000);
         } catch (jsonError) {
           console.error('Error parsing success response:', jsonError);
           throw new Error('Invalid response format from server');
@@ -117,12 +124,27 @@ export default function NewProject() {
       alert(error instanceof Error ? error.message : 'Failed to create project');
     } finally {
       setIsLoading(false);
+      setLoadingStep('');
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
       <DashboardHeader user={session.user!} />
+      
+      {/* Loading Overlay */}
+      {isLoading && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-md mx-4 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Creating Your Project</h3>
+            <p className="text-gray-600">{loadingStep}</p>
+            <p className="text-sm text-gray-500 mt-4">
+              This may take a few moments as we generate your AI-powered landscape design...
+            </p>
+          </div>
+        </div>
+      )}
       
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
@@ -311,7 +333,7 @@ export default function NewProject() {
               disabled={isLoading}
               className="px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'Generating...' : 'Generate Proposal'}
+              {isLoading ? 'Creating Project & Generating AI Content...' : 'Create Project & Generate Proposal'}
             </button>
           </div>
         </form>

@@ -24,3 +24,12 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Ensure form inputs have proper text color for accessibility */
+input, textarea, select {
+  color: #111827; /* text-gray-900 equivalent */
+}
+
+input::placeholder, textarea::placeholder {
+  color: #6b7280; /* text-gray-500 equivalent */
+}

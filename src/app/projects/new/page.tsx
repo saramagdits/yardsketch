@@ -43,27 +43,78 @@ export default function NewProject() {
     setIsLoading(true);
 
     try {
-      // TODO: Implement project creation with image upload and AI generation
-      const formDataToSend = new FormData();
-      formDataToSend.append('data', JSON.stringify(formData));
-      if (selectedImage) {
-        formDataToSend.append('image', selectedImage);
+      console.log('Form submission started');
+      console.log('Form data:', formData);
+      console.log('Selected image:', selectedImage);
+      
+      // Validate required fields
+      if (!formData.name || !formData.climateZone || !selectedImage) {
+        throw new Error('Please fill in all required fields and upload an image');
       }
 
-      const response = await fetch('/api/projects', {
-        method: 'POST',
-        body: formDataToSend,
-      });
+      const formDataToSend = new FormData();
+      const dataString = JSON.stringify(formData);
+      console.log('Data string to send:', dataString);
+      
+      formDataToSend.append('data', dataString);
+      if (selectedImage) {
+        formDataToSend.append('image', selectedImage);
+        console.log('Image appended:', selectedImage.name, selectedImage.size);
+      }
 
+      console.log('Sending request to /api/projects');
+      console.log('FormData entries:');
+      for (const [key, value] of formDataToSend.entries()) {
+        console.log(`${key}:`, value);
+      }
+      
+      let response;
+      try {
+        response = await fetch('/api/projects', {
+          method: 'POST',
+          body: formDataToSend,
+        });
+      } catch (fetchError) {
+        console.error('Fetch error:', fetchError);
+        throw new Error(`Network error: ${fetchError instanceof Error ? fetchError.message : 'Unknown network error'}`);
+      }
+
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+      
       if (response.ok) {
-        const project = await response.json();
-        router.push(`/projects/${project.id}`);
+        try {
+          const project = await response.json();
+          console.log('Project created:', project);
+          router.push(`/projects/${project.id}`);
+        } catch (jsonError) {
+          console.error('Error parsing success response:', jsonError);
+          throw new Error('Invalid response format from server');
+        }
       } else {
-        throw new Error('Failed to create project');
+        try {
+          const errorText = await response.text();
+          console.error('API Error Response Text:', errorText);
+          
+          let errorData;
+          try {
+            errorData = JSON.parse(errorText);
+          } catch (parseError) {
+            console.error('Failed to parse error response as JSON:', parseError);
+            errorData = { error: errorText || 'Unknown error occurred' };
+          }
+          
+          console.error('API Error:', errorData);
+          throw new Error(errorData.error || 'Failed to create project');
+        } catch (textError) {
+          console.error('Error reading error response:', textError);
+          throw new Error(`Server error: ${response.status} ${response.statusText}`);
+        }
       }
     } catch (error) {
       console.error('Error creating project:', error);
-      // TODO: Show error message to user
+      // Show error message to user
+      alert(error instanceof Error ? error.message : 'Failed to create project');
     } finally {
       setIsLoading(false);
     }
@@ -97,7 +148,7 @@ export default function NewProject() {
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 placeholder-gray-500"
                   placeholder="e.g., Smith Residence Front Yard"
                 />
               </div>
@@ -111,7 +162,7 @@ export default function NewProject() {
                   required
                   value={formData.climateZone}
                   onChange={(e) => setFormData({ ...formData, climateZone: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
                 >
                   <option value="">Select climate zone</option>
                   <option value="1">Zone 1 - Very Cold</option>
@@ -134,7 +185,7 @@ export default function NewProject() {
                   required
                   value={formData.sunExposure}
                   onChange={(e) => setFormData({ ...formData, sunExposure: e.target.value as 'full-sun' | 'partial-sun' | 'shade' })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
                 >
                   <option value="full-sun">Full Sun (6+ hours)</option>
                   <option value="partial-sun">Partial Sun (3-6 hours)</option>
@@ -151,9 +202,9 @@ export default function NewProject() {
                   id="squareFootage"
                   required
                   min="1"
-                  value={formData.squareFootage}
-                  onChange={(e) => setFormData({ ...formData, squareFootage: parseInt(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  value={formData.squareFootage || ''}
+                  onChange={(e) => setFormData({ ...formData, squareFootage: parseInt(e.target.value) || 0 })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 placeholder-gray-500"
                   placeholder="e.g., 500"
                 />
               </div>
@@ -167,7 +218,7 @@ export default function NewProject() {
                   required
                   value={formData.designStyle}
                   onChange={(e) => setFormData({ ...formData, designStyle: e.target.value as 'modern' | 'traditional' | 'cottage' | 'tropical' | 'desert' | 'woodland' })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
                 >
                   <option value="modern">Modern</option>
                   <option value="traditional">Traditional</option>
@@ -186,9 +237,9 @@ export default function NewProject() {
                   type="number"
                   id="budget"
                   min="0"
-                  value={formData.budget}
+                  value={formData.budget || ''}
                   onChange={(e) => setFormData({ ...formData, budget: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 placeholder-gray-500"
                   placeholder="e.g., 5000"
                 />
               </div>
@@ -203,7 +254,7 @@ export default function NewProject() {
                 rows={3}
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 placeholder-gray-500"
                 placeholder="Any specific requirements or preferences..."
               />
             </div>
@@ -224,7 +275,7 @@ export default function NewProject() {
                   accept="image/*"
                   required
                   onChange={handleImageChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
                 />
                 <p className="text-sm text-gray-500 mt-1">
                   Upload a clear photo of the area you want to landscape

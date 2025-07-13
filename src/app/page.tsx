@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from 'next-auth/next';
 import { redirect } from 'next/navigation';
 
 export default async function Home() {

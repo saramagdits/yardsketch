@@ -1,9 +1,10 @@
-import { getServerSession } from 'next-auth';
+import { getServerSession } from 'next-auth/next';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { DashboardHeader } from '@/components/DashboardHeader';
 import { ProjectCard } from '@/components/ProjectCard';
 import { Project } from '@/types/project';
+import { getRecentProjects } from '@/lib/projects';
 
 export default async function Dashboard() {
   const session = await getServerSession();
@@ -12,18 +13,26 @@ export default async function Dashboard() {
     redirect('/auth/signin');
   }
 
-  // TODO: Fetch user's projects from Firebase
-  const projects: Project[] = []; // Placeholder for now
+  // Fetch user's recent projects from Firestore
+  let projects: Project[] = [];
+  try {
+    if (session.user?.email) {
+      projects = await getRecentProjects(session.user.email, 3);
+    }
+  } catch (error) {
+    console.error('Error fetching recent projects:', error);
+    // Continue with empty projects array if there's an error
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <DashboardHeader user={session.user} />
+      <DashboardHeader user={session.user!} />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-600 mt-2">
-            Welcome back, {session.user.name}! Create your next landscape proposal.
+            Welcome back, {session.user?.name || 'User'}! Create your next landscape proposal.
           </p>
         </div>
 

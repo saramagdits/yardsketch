@@ -19,12 +19,32 @@ export function ProjectCard({ project }: ProjectCardProps) {
     }
   };
 
-  const formatDate = (date: Date) => {
+  const formatDate = (date: Date | string | null | undefined) => {
+    // Handle cases where date might be invalid, null, or not a proper Date object
+    if (!date) {
+      return 'Unknown date';
+    }
+    
+    let dateObj: Date;
+    
+    if (date instanceof Date) {
+      dateObj = date;
+    } else if (typeof date === 'string') {
+      dateObj = new Date(date);
+    } else {
+      return 'Unknown date';
+    }
+    
+    // Check if the date is valid
+    if (isNaN(dateObj.getTime())) {
+      return 'Unknown date';
+    }
+    
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
-    }).format(date);
+    }).format(dateObj);
   };
 
   return (

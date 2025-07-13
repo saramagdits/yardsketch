@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { db } from '@/lib/firebase';
@@ -31,6 +31,45 @@ if (getApps().length === 0) {
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+export async function GET(request: NextRequest) {
+  try {
+    // Get the user session
+    const session = await getServerSession();
+    
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+    
+    const userId = session.user.email;
+    
+    // Query projects for the current user, ordered by creation date (newest first)
+    const projectsQuery = query(
+      collection(db, 'projects'),
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc')
+    );
+    
+    const querySnapshot = await getDocs(projectsQuery);
+    const projects = querySnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate?.() || data.createdAt,
+        updatedAt: data.updatedAt?.toDate?.() || data.updatedAt,
+      };
+    });
+    
+    return NextResponse.json(projects);
+  } catch (error) {
+    console.error('Error fetching projects:', error);
+    return NextResponse.json(
+      { error: `Failed to fetch projects: ${error instanceof Error ? error.message : 'Unknown error'}` },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {

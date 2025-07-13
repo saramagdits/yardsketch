@@ -3,8 +3,8 @@ export interface Project {
   name: string;
   description?: string;
   status: 'draft' | 'completed' | 'archived';
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
   originalImage?: string;
   generatedImages?: string[];
   designThesis?: string;

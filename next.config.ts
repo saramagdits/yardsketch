@@ -15,6 +15,19 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'storage.googleapis.com',
+        port: '',
+        pathname: '/**',
+      },
+      // Add support for any Firebase Storage bucket
+      {
+        protocol: 'https',
+        hostname: '*.storage.googleapis.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
 };

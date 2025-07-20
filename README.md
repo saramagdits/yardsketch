@@ -214,6 +214,26 @@ Creates a new project with AI-generated content.
 - 401: Authentication required
 - 500: Server error
 
+## Image Storage
+
+The application handles image storage in two ways:
+
+### Original Images
+- User-uploaded photos are stored directly in Firebase Storage
+- Organized by user ID and project ID
+- Made publicly accessible for display
+
+### Generated Images
+- DALL-E generated images are downloaded and stored permanently in Firebase Storage
+- This prevents 403 errors from expired temporary URLs
+- Images are organized in `projects/{userId}/{projectId}/generated_{timestamp}_{index}.png`
+- All images are made publicly accessible for display
+
+### Image Optimization
+- Next.js Image component is used for optimization
+- Firebase Storage URLs are configured in `next.config.ts`
+- Fallback error handling for failed image loads
+
 ## Contributing
 
 1. Fork the repository

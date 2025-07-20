@@ -32,6 +32,60 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Function to download and store images permanently
+async function downloadAndStoreImages(imageUrls: string[], userId: string, projectId: string): Promise<string[]> {
+  if (!imageUrls || imageUrls.length === 0) {
+    console.log('No images to download and store');
+    return [];
+  }
+
+  const adminStorage = getStorage();
+  const bucket = adminStorage.bucket(process.env.FIREBASE_STORAGE_BUCKET!);
+  const storedUrls: string[] = [];
+
+  for (let i = 0; i < imageUrls.length; i++) {
+    try {
+      const imageUrl = imageUrls[i];
+      if (!imageUrl) {
+        console.warn(`Skipping empty image URL at index ${i}`);
+        continue;
+      }
+
+      console.log(`Downloading image ${i + 1}/${imageUrls.length}:`, imageUrl);
+      
+      // Download the image from OpenAI
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+      }
+      
+      const imageBuffer = await response.arrayBuffer();
+      const fileName = `projects/${userId}/${projectId}/generated_${Date.now()}_${i}.png`;
+      
+      console.log('Storing image as:', fileName);
+      const file = bucket.file(fileName);
+      await file.save(Buffer.from(imageBuffer), {
+        metadata: {
+          contentType: 'image/png',
+        },
+      });
+      
+      // Make the file publicly accessible
+      await file.makePublic();
+      const storedUrl = `https://storage.googleapis.com/${process.env.FIREBASE_STORAGE_BUCKET}/${fileName}`;
+      storedUrls.push(storedUrl);
+      
+      console.log('Image stored successfully:', storedUrl);
+    } catch (error) {
+      console.error(`Error downloading/storing image ${i + 1}:`, error);
+      // If we can't store the image, keep the original URL as fallback
+      storedUrls.push(imageUrls[i]);
+    }
+  }
+
+  return storedUrls;
+}
+
 export async function GET() {
   try {
     // Get the user session
@@ -265,17 +319,20 @@ Style: High quality, photorealistic, professional landscape design rendering tha
     console.log('Materials parsed:', materialsList.length, 'items');
     console.log('Total cost calculated:', totalCost);
 
-    // Update project document with generated content
+    // Download and store generated images permanently
+    const storedGeneratedImages = await downloadAndStoreImages(generatedImages, userId, projectDoc.id);
+
+    // Update project document with generated content and permanently stored images
     await updateDoc(doc(db, 'projects', projectDoc.id), {
       status: 'completed',
-      generatedImages,
+      generatedImages: storedGeneratedImages,
       designThesis,
       materialsList,
       totalCost,
       updatedAt: serverTimestamp(),
     });
 
-    console.log('Project updated with generated content');
+    console.log('Project updated with generated content and permanently stored images');
 
     // Return the complete project data
     const project = {
@@ -285,7 +342,7 @@ Style: High quality, photorealistic, professional landscape design rendering tha
       description: projectData.notes || '',
       status: 'completed',
       originalImage: imageUrl,
-      generatedImages,
+      generatedImages: storedGeneratedImages,
       designThesis,
       materialsList,
       totalCost,

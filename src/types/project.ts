@@ -10,6 +10,7 @@ export interface Project {
   designThesis?: string;
   materialsList?: Material[];
   totalCost?: number;
+  imageAnalysis?: string;
   climateZone?: string;
   sunExposure?: string;
   squareFootage?: number;

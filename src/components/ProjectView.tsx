@@ -184,6 +184,21 @@ export function ProjectView({ project }: ProjectViewProps) {
             </div>
           </div>
 
+          {/* Image Analysis */}
+          {project.imageAnalysis && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Property Analysis</h2>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-blue-900 text-sm">
+                  <strong>AI Analysis of Your Property:</strong> {project.imageAnalysis}
+                </p>
+                <p className="text-blue-700 text-xs mt-2">
+                  This analysis was used to generate designs that better match your property's characteristics.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Materials List */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Materials & Cost Breakdown</h2>

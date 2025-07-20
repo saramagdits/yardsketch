@@ -252,61 +252,356 @@ export async function POST(request: NextRequest) {
 
     console.log('Project document created with ID:', projectDoc.id);
 
-    // Generate AI content with enhanced prompts
-    const designPrompt = `Create a comprehensive, professional landscape design proposal for a ${projectData.squareFootage} square foot area with ${projectData.sunExposure} exposure in climate zone ${projectData.climateZone}. The design style should be ${projectData.designStyle}. ${projectData.notes ? `Additional requirements: ${projectData.notes}` : ''}
+    // Generate AI content with enhanced prompts that include the uploaded image
+    const designPrompt = `I have uploaded a photo of a property that needs landscape design. Please analyze this image and create a comprehensive, professional landscape design proposal for a ${projectData.squareFootage} square foot area with ${projectData.sunExposure} exposure in climate zone ${projectData.climateZone}. The design style should be ${projectData.designStyle}. ${projectData.notes ? `Additional requirements: ${projectData.notes}` : ''}
+
+CRITICAL REQUIREMENTS FOR IMAGE MODIFICATION:
+- You will be editing the uploaded image to enhance ONLY the yard and landscaping areas
+- Do NOT modify, remove, or alter any existing structures (house, garage, shed, driveway, etc.)
+- Only enhance the landscaping, garden beds, and yard spaces
+- Keep all buildings, structures, and hardscape elements exactly as they appear in the original image
+- Focus your modifications on adding plants, trees, shrubs, pathways, and garden elements to the yard areas only
+
+When analyzing the image, please:
+- Identify all existing structures (houses, sheds, garages, etc.) and note their locations
+- Observe the current yard layout, existing plants, and hardscape elements
+- Consider the property's current condition and what can be enhanced
+- Do NOT suggest removing or altering any existing structures - only work with the yard and landscaping areas
 
 Please provide a detailed response that includes:
 
-1. **Design Philosophy**: Explain the overall design approach and how it addresses the specific site conditions
-2. **Plant Selection Strategy**: Detail the plant choices, including specific species that thrive in this climate zone and sun exposure
-3. **Hardscape Elements**: Describe any pathways, patios, retaining walls, or other structural elements
-4. **Materials List**: Provide a comprehensive list of materials with quantities and estimated costs
-5. **Maintenance Recommendations**: Include care instructions for the selected plants and hardscape elements
-6. **Seasonal Considerations**: Address how the design will look and function throughout the year
+1. **Site Analysis**: Describe what you observe in the uploaded image, including existing structures, current landscaping, and site conditions
+2. **Design Philosophy**: Explain the overall design approach and how it addresses the specific site conditions while preserving existing structures
+3. **Plant Selection Strategy**: Detail the plant choices, including specific species that thrive in this climate zone and sun exposure, focusing on areas that can be enhanced
+4. **Hardscape Elements**: Describe any pathways, patios, retaining walls, or other structural elements that would complement the existing property
+5. **Materials List**: Provide a comprehensive list of materials with quantities and estimated costs
+6. **Maintenance Recommendations**: Include care instructions for the selected plants and hardscape elements
+7. **Seasonal Considerations**: Address how the design will look and function throughout the year
 
-Make the response sound professional and authoritative, as if written by a landscape designer with 20+ years of experience. Focus on practical, implementable solutions that will create a beautiful, functional, and sustainable landscape.`;
+Make the response sound professional and authoritative, as if written by a landscape designer with 20+ years of experience. Focus on practical, implementable solutions that will create a beautiful, functional, and sustainable landscape while working with the existing property layout.`;
 
-    const imagePrompt = `Professional landscape design rendering of a ${projectData.designStyle} style garden for a ${projectData.squareFootage} square foot area with ${projectData.sunExposure} exposure in climate zone ${projectData.climateZone}. 
+    // Analyze the uploaded image to extract characteristics for better image generation
+    let imageAnalysis = '';
+    if (imageUrl) {
+      try {
+        const analysisResponse = await openai.chat.completions.create({
+          model: 'gpt-4o',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert landscape designer. Analyze the uploaded property image and describe the key characteristics that should be maintained in a landscape design rendering.',
+            },
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: 'Please analyze this property image and describe: 1) The architectural style of the building, 2) The current landscaping condition, 3) The property layout and size, 4) Any existing hardscape elements, 5) The overall aesthetic style. Keep your response concise and focused on visual characteristics.',
+                },
+                {
+                  type: 'image_url',
+                  image_url: { url: imageUrl },
+                },
+              ],
+            },
+          ],
+          max_tokens: 300,
+          temperature: 0.3,
+        });
+        
+        imageAnalysis = analysisResponse.choices[0]?.message?.content || '';
+        console.log('Image analysis:', imageAnalysis);
+      } catch (analysisError) {
+        console.error('Error analyzing image:', analysisError);
+        imageAnalysis = '';
+      }
+    }
 
-Include:
-- Appropriate plants and trees for this climate and sun exposure
-- Hardscaping elements like pathways, patios, or retaining walls
-- Proper scale and perspective
-- Natural lighting and shadows
-- Professional landscape design visualization quality
-- Realistic materials and textures
+    const imagePrompt = `Create a professional landscape design rendering for a ${projectData.designStyle} style enhancement of a ${projectData.squareFootage} square foot residential property with ${projectData.sunExposure} exposure in climate zone ${projectData.climateZone}. 
 
-Style: High quality, photorealistic, professional landscape design rendering that looks like it was created by an experienced landscape architect.`;
+CRITICAL REQUIREMENTS:
+- Show a realistic residential property with a house or building in the background
+- Include existing structures (house, garage, shed) that should remain unchanged
+- Focus on enhancing only the yard areas, flower beds, and landscaping elements
+- Add appropriate plants and trees for this climate and sun exposure to the yard areas
+- Include hardscaping elements like pathways, patios, or retaining walls in the yard spaces
+- Use natural lighting and shadows typical of outdoor property photos
+- Make the yard areas look professionally landscaped while keeping the structures intact
+- Maintain realistic perspective and scale as if it's a real property photo
+- Use the same architectural style and color palette throughout
 
-    console.log('Generating AI content...');
+Style: High quality, photorealistic property photo with professionally designed landscaping in the yard areas, keeping all structures exactly as they would appear in a real property. The design should look like a before-and-after transformation where only the landscaping has been enhanced.`;
+
+    // Create image editing prompts for ChatGPT to modify only the yard areas
+    const yardEditingPrompts = [
+      `Please enhance only the yard and landscaping areas of this property image. Add professional landscaping including:
+- Flower beds with appropriate plants for climate zone ${projectData.climateZone} and ${projectData.sunExposure} exposure
+- Trees and shrubs that complement the existing property
+- Pathways or walkways in the yard areas
+- Garden elements like raised beds or decorative features
+- Maintain the exact same house, buildings, and structures - do not modify them at all
+- Only enhance the yard areas to look professionally landscaped
+- Use ${projectData.designStyle} style for the landscaping elements
+- Keep the same lighting, perspective, and architectural style as the original image`,
+
+      `Transform only the yard areas of this property into a beautiful landscape design. Please:
+- Add flowering plants and shrubs suitable for ${projectData.sunExposure} exposure in zone ${projectData.climateZone}
+- Include small trees or ornamental plants in the yard spaces
+- Create garden beds with mulch and edging
+- Add a small patio or seating area in the yard if space allows
+- Preserve all existing structures exactly as they are
+- Only modify the landscaping and yard areas
+- Use ${projectData.designStyle} aesthetic for the new landscaping
+- Maintain the original image's lighting and perspective`,
+
+      `Enhance the landscaping of this property while keeping all structures intact. Please:
+- Add professional garden beds with appropriate plants for this climate
+- Include pathways or stepping stones in the yard areas
+- Add decorative elements like garden ornaments or lighting
+- Plant trees or shrubs that will thrive in ${projectData.sunExposure} exposure, zone ${projectData.climateZone}
+- Keep the house and all buildings exactly as they appear
+- Only modify the yard and garden areas
+- Use ${projectData.designStyle} design principles
+- Maintain the same architectural style and color palette`
+    ];
+
+    console.log('Generating AI content with uploaded image...');
     
-    const [designResponse, imageResponse] = await Promise.all([
-      openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an experienced landscape designer with over 20 years of experience creating professional proposals. Provide detailed, practical advice that sounds authoritative and knowledgeable. Focus on creating beautiful, functional, and sustainable landscapes that work with the specific site conditions.',
-          },
-          {
-            role: 'user',
-            content: designPrompt,
-          },
-        ],
+    // Prepare the image for ChatGPT if available
+    let designMessages;
+    
+    if (imageUrl) {
+      // Use GPT-4o model which supports image input
+      designMessages = [
+        {
+          role: 'system' as const,
+          content: 'You are an experienced landscape designer with over 20 years of experience creating professional proposals. You can analyze uploaded images and provide detailed, practical advice that sounds authoritative and knowledgeable. Focus on creating beautiful, functional, and sustainable landscapes that work with the specific site conditions while preserving existing structures. When editing images, you will ONLY modify the yard and landscaping areas - never touch any buildings, structures, or hardscape elements.',
+        },
+        {
+          role: 'user' as const,
+          content: [
+            {
+              type: 'text' as const,
+              text: designPrompt,
+            },
+            {
+              type: 'image_url' as const,
+              image_url: {
+                url: imageUrl,
+              },
+            },
+          ],
+        },
+      ];
+    } else {
+      // Fallback to text-only for GPT-4o-mini
+      designMessages = [
+        {
+          role: 'system' as const,
+          content: 'You are an experienced landscape designer with over 20 years of experience creating professional proposals. Provide detailed, practical advice that sounds authoritative and knowledgeable. Focus on creating beautiful, functional, and sustainable landscapes that work with the specific site conditions.',
+        },
+        {
+          role: 'user' as const,
+          content: designPrompt,
+        },
+      ];
+    }
+    
+    let designResponse;
+    let generatedImages: string[] = [];
+    
+    try {
+      // Generate design thesis
+      designResponse = await openai.chat.completions.create({
+        model: imageUrl ? 'gpt-4o' : 'gpt-4o-mini',
+        messages: designMessages,
         max_tokens: 2000,
         temperature: 0.7,
-      }),
-      openai.images.generate({
-        model: 'dall-e-3',
-        prompt: imagePrompt,
-        n: 1,
-        size: '1024x1024',
-        quality: 'standard',
-      }),
-    ]);
+      });
+
+      if (imageUrl) {
+        // Use ChatGPT's image editing capabilities to modify only the yard areas
+        console.log('Using ChatGPT image editing to modify yard areas only...');
+        
+        try {
+          // Create messages for image editing using ChatGPT
+          const editMessages = [
+            {
+              role: 'system' as const,
+              content: 'You are an expert landscape designer and image editor. Your task is to enhance only the yard and landscaping areas of the provided property image while keeping all existing structures (house, garage, shed, etc.) exactly as they are. Do not modify any buildings or structures - only enhance the landscaping and yard areas.',
+            },
+            {
+              role: 'user' as const,
+              content: [
+                {
+                  type: 'text' as const,
+                  text: yardEditingPrompts[0],
+                },
+                {
+                  type: 'image_url' as const,
+                  image_url: {
+                    url: imageUrl,
+                  },
+                },
+              ],
+            },
+          ];
+
+          // Use ChatGPT to edit the image
+          const editResponse = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages: editMessages,
+            max_tokens: 1000,
+            temperature: 0.7,
+          });
+
+          // Extract any generated image URLs from the response
+          const responseContent = editResponse.choices[0]?.message?.content || '';
+          
+          // If ChatGPT provides image URLs in the response, extract them
+          const imageUrlMatches = responseContent.match(/https:\/\/[^\s]+\.(?:png|jpg|jpeg|webp)/gi);
+          if (imageUrlMatches && imageUrlMatches.length > 0) {
+            generatedImages.push(...imageUrlMatches);
+          } else {
+            // Fallback to DALL-E 3 if ChatGPT doesn't provide edited images
+            console.log('ChatGPT didn\'t provide edited images, using DALL-E 3 fallback');
+            const fallbackResponse = await openai.images.generate({
+              model: 'dall-e-3',
+              prompt: `Create a professional landscape design rendering that enhances a residential property. ${imageAnalysis ? `Based on the analysis: ${imageAnalysis}. ` : ''}Style: ${projectData.designStyle}, Climate: Zone ${projectData.climateZone}, Sun: ${projectData.sunExposure}, Size: ${projectData.squareFootage} sq ft. Include a realistic house or building in the background with professionally landscaped yard areas featuring plants, trees, pathways, and garden elements appropriate for this climate zone. The design should look like a before-and-after transformation where only the landscaping has been enhanced.`,
+              n: 1,
+              size: '1024x1024',
+              quality: 'standard',
+            });
+            
+            if (fallbackResponse.data && fallbackResponse.data.length > 0) {
+              generatedImages.push(fallbackResponse.data[0].url || '');
+            }
+          }
+        } catch (genError) {
+          console.error('Error with image editing:', genError);
+          
+          // Fallback to DALL-E 3 if ChatGPT editing fails
+          try {
+            const fallbackResponse = await openai.images.generate({
+              model: 'dall-e-3',
+              prompt: `Create a professional landscape design rendering that enhances a residential property. ${imageAnalysis ? `Based on the analysis: ${imageAnalysis}. ` : ''}Style: ${projectData.designStyle}, Climate: Zone ${projectData.climateZone}, Sun: ${projectData.sunExposure}, Size: ${projectData.squareFootage} sq ft. Include a realistic house or building in the background with professionally landscaped yard areas featuring plants, trees, pathways, and garden elements appropriate for this climate zone. The design should look like a before-and-after transformation where only the landscaping has been enhanced.`,
+              n: 1,
+              size: '1024x1024',
+              quality: 'standard',
+            });
+            
+            if (fallbackResponse.data && fallbackResponse.data.length > 0) {
+              generatedImages.push(fallbackResponse.data[0].url || '');
+            }
+          } catch (fallbackError) {
+            console.error('Fallback DALL-E 3 generation also failed:', fallbackError);
+          }
+        }
+      } else {
+        // No image uploaded, use regular generation
+        const imageResponse = await openai.images.generate({
+          model: 'dall-e-3',
+          prompt: imagePrompt,
+          n: 1,
+          size: '1024x1024',
+          quality: 'standard',
+        });
+        
+        generatedImages = imageResponse.data?.map((img: any) => img.url || '') || [];
+      }
+
+      console.log('Generated images count:', generatedImages.length);
+    } catch (imageError) {
+      console.error('Error with image generation, trying with simpler prompt:', imageError);
+      
+      // Fallback: try with a simpler prompt
+      try {
+        designResponse = await openai.chat.completions.create({
+          model: imageUrl ? 'gpt-4o' : 'gpt-4o-mini',
+          messages: designMessages,
+          max_tokens: 2000,
+          temperature: 0.7,
+        });
+
+        // Try ChatGPT image editing as fallback
+        if (imageUrl) {
+          try {
+            const fallbackEditMessages = [
+              {
+                role: 'system' as const,
+                content: 'You are an expert landscape designer and image editor. Your task is to enhance only the yard and landscaping areas of the provided property image while keeping all existing structures exactly as they are.',
+              },
+              {
+                role: 'user' as const,
+                content: [
+                  {
+                    type: 'text' as const,
+                    text: `Please enhance only the yard areas of this property image. Add professional landscaping including flower beds, trees, shrubs, and pathways suitable for climate zone ${projectData.climateZone} with ${projectData.sunExposure} exposure. Use ${projectData.designStyle} style. Do not modify any buildings or structures - only enhance the landscaping and yard areas.`,
+                  },
+                  {
+                    type: 'image_url' as const,
+                    image_url: {
+                      url: imageUrl,
+                    },
+                  },
+                ],
+              },
+            ];
+
+            const fallbackEditResponse = await openai.chat.completions.create({
+              model: 'gpt-4o',
+              messages: fallbackEditMessages,
+              max_tokens: 1000,
+              temperature: 0.7,
+            });
+
+            const responseContent = fallbackEditResponse.choices[0]?.message?.content || '';
+            const imageUrlMatches = responseContent.match(/https:\/\/[^\s]+\.(?:png|jpg|jpeg|webp)/gi);
+            
+            if (imageUrlMatches && imageUrlMatches.length > 0) {
+              generatedImages = imageUrlMatches;
+            } else {
+              // Final fallback to DALL-E 3
+              const fallbackResponse = await openai.images.generate({
+                model: 'dall-e-3',
+                prompt: `Create a professional landscape design rendering for a ${projectData.designStyle} style enhancement of a ${projectData.squareFootage} square foot property with ${projectData.sunExposure} exposure in climate zone ${projectData.climateZone}. Include a realistic house or building in the background with professionally landscaped yard areas featuring appropriate plants, trees, and hardscaping elements. Style: High quality, photorealistic property photo.`,
+                n: 1,
+                size: '1024x1024',
+                quality: 'standard',
+              });
+              generatedImages = fallbackResponse.data?.map((img: any) => img.url || '') || [];
+            }
+          } catch (editError) {
+            console.error('ChatGPT image editing fallback failed:', editError);
+            // Final fallback to DALL-E 3
+            const fallbackResponse = await openai.images.generate({
+              model: 'dall-e-3',
+              prompt: `Create a professional landscape design rendering for a ${projectData.designStyle} style enhancement of a ${projectData.squareFootage} square foot property with ${projectData.sunExposure} exposure in climate zone ${projectData.climateZone}. Include a realistic house or building in the background with professionally landscaped yard areas featuring appropriate plants, trees, and hardscaping elements. Style: High quality, photorealistic property photo.`,
+              n: 1,
+              size: '1024x1024',
+              quality: 'standard',
+            });
+            generatedImages = fallbackResponse.data?.map((img: any) => img.url || '') || [];
+          }
+        } else {
+          // No image uploaded, use DALL-E 3 generation
+          const fallbackResponse = await openai.images.generate({
+            model: 'dall-e-3',
+            prompt: `Create a professional landscape design rendering for a ${projectData.designStyle} style enhancement of a ${projectData.squareFootage} square foot property with ${projectData.sunExposure} exposure in climate zone ${projectData.climateZone}. Include a realistic house or building in the background with professionally landscaped yard areas featuring appropriate plants, trees, and hardscaping elements. Style: High quality, photorealistic property photo.`,
+            n: 1,
+            size: '1024x1024',
+            quality: 'standard',
+          });
+          generatedImages = fallbackResponse.data?.map((img: any) => img.url || '') || [];
+        }
+        console.log('Fallback generated images count:', generatedImages.length);
+      } catch (fallbackError) {
+        console.error('Fallback image generation also failed:', fallbackError);
+        throw new Error('Failed to generate images. Please try again.');
+      }
+    }
 
     const designThesis = designResponse.choices[0]?.message?.content || '';
-    const generatedImages = imageResponse.data?.map(img => img.url || '') || [];
 
     console.log('AI content generated successfully');
     console.log('Design thesis length:', designThesis.length);
@@ -329,6 +624,7 @@ Style: High quality, photorealistic, professional landscape design rendering tha
       designThesis,
       materialsList,
       totalCost,
+      imageAnalysis,
       updatedAt: serverTimestamp(),
     });
 
@@ -346,6 +642,7 @@ Style: High quality, photorealistic, professional landscape design rendering tha
       designThesis,
       materialsList,
       totalCost,
+      imageAnalysis,
       climateZone: projectData.climateZone,
       sunExposure: projectData.sunExposure || 'full-sun',
       squareFootage: projectData.squareFootage,

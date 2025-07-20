@@ -246,7 +246,7 @@ export async function GET(
       yPosition += 8;
 
       // Materials
-      project.materialsList.forEach((material: Material, index: number) => {
+      project.materialsList.forEach((material: Material) => {
         if (checkNewPage(15)) {
           // Redraw header on new page
           pdf.setFillColor(249, 250, 251);

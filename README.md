@@ -6,7 +6,7 @@ YardSketch is a web application that allows independent landscapers to generate 
 
 - **AI-Generated Renderings**: Upload a photo and get multiple professional landscape design options
 - **Professional Proposals**: Detailed design explanations, material lists, and cost estimates
-- **Instant Downloads**: Download proposals as professional PDFs ready for clients
+- **Instant Downloads**: Download proposals as professional PDFs ready for clients with comprehensive project information
 - **Google OAuth Authentication**: Secure user authentication
 - **Firebase Integration**: Cloud storage for projects and user data
 - **Stripe Payments**: Integrated payment processing
@@ -42,7 +42,7 @@ The project creation process is fully integrated with Firebase and AI services:
 - **Storage**: Firebase Storage
 - **AI**: OpenAI GPT-4 for content generation, DALL-E for image generation
 - **Payments**: Stripe
-- **PDF Generation**: Puppeteer or react-pdf
+- **PDF Generation**: jsPDF for client-ready project reports
 
 ## Getting Started
 
@@ -213,6 +213,27 @@ Creates a new project with AI-generated content.
 - 400: Invalid request data
 - 401: Authentication required
 - 500: Server error
+
+### GET /api/projects/[id]/pdf
+Generates a professional PDF report for a specific project.
+
+**Request:**
+- URL parameter: `id` - Project ID
+
+**Response:**
+- 200: PDF file with project information
+- 404: Project not found
+- 500: Server error
+
+**PDF Contents:**
+- Project header with YardSketch branding
+- Project specifications (climate zone, sun exposure, square footage, etc.)
+- Original property image
+- Generated design images (up to 2)
+- Comprehensive design thesis
+- Detailed materials list with cost breakdown
+- Total project cost
+- Professional footer with generation date
 
 ## Image Storage
 

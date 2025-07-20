@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { Project } from '@/types/project';
 
 interface ProjectViewProps {
@@ -10,12 +11,13 @@ interface ProjectViewProps {
 export function ProjectView({ project }: ProjectViewProps) {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
-  const formatDate = (date: Date) => {
+  const formatDate = (date: Date | string) => {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
     return new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
-    }).format(date);
+    }).format(dateObj);
   };
 
   const getCategoryColor = (category: string) => {
@@ -63,9 +65,11 @@ export function ProjectView({ project }: ProjectViewProps) {
               
               <div className="space-y-4">
                 <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
-                  <img
+                  <Image
                     src={project.generatedImages[selectedImageIndex]}
                     alt={`Generated design ${selectedImageIndex + 1}`}
+                    width={800}
+                    height={450}
                     className="w-full h-full object-cover"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
@@ -86,9 +90,11 @@ export function ProjectView({ project }: ProjectViewProps) {
                             : 'border-gray-200 hover:border-gray-300'
                         }`}
                       >
-                        <img
+                        <Image
                           src={image}
                           alt={`Design option ${index + 1}`}
+                          width={80}
+                          height={80}
                           className="w-full h-full object-cover"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
@@ -208,9 +214,11 @@ export function ProjectView({ project }: ProjectViewProps) {
           {project.originalImage && (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Original Property</h3>
-              <img
+              <Image
                 src={project.originalImage}
                 alt="Original property"
+                width={400}
+                height={192}
                 className="w-full h-48 object-cover rounded-lg"
               />
             </div>

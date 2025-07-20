@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { Project } from '@/types/project';
 
 interface ProjectCardProps {
@@ -76,9 +77,11 @@ export function ProjectCard({ project }: ProjectCardProps) {
 
         {project.generatedImages && project.generatedImages.length > 0 && (
           <div className="mt-4">
-            <img
+            <Image
               src={project.generatedImages[0]}
               alt="Generated design"
+              width={400}
+              height={128}
               className="w-full h-32 object-cover rounded-lg"
             />
           </div>

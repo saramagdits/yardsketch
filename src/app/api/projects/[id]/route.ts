@@ -5,7 +5,7 @@ import { db } from '@/lib/firebase';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Get the user session
@@ -16,7 +16,7 @@ export async function GET(
     }
 
     const userId = session.user.email;
-    const projectId = params.id;
+    const { id: projectId } = await params;
 
     // Fetch the project from Firestore
     const projectDoc = await getDoc(doc(db, 'projects', projectId));

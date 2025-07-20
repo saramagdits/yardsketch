@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { DashboardHeader } from '@/components/DashboardHeader';
 import { useSession } from 'next-auth/react';
 import { ProjectFormData } from '@/types/project';
@@ -309,9 +310,11 @@ export default function NewProject() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Preview
                   </label>
-                  <img
+                  <Image
                     src={imagePreview}
                     alt="Property preview"
+                    width={400}
+                    height={256}
                     className="w-full max-w-md h-64 object-cover rounded-lg border border-gray-300"
                   />
                 </div>

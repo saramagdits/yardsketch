@@ -6,15 +6,15 @@ import { db } from '@/lib/firebase';
 import { Project } from '@/types/project';
 
 interface ProjectPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default async function ProjectPage({ params }: ProjectPageProps) {
   // For now, we'll skip authentication check and fetch the project directly
   // TODO: Implement proper authentication
-  const projectId = params.id;
+  const { id: projectId } = await params;
 
   try {
     // Fetch project from Firestore

@@ -32,7 +32,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Get the user session
     const session = await getServerSession();
@@ -100,7 +100,15 @@ export async function POST(request: NextRequest) {
     // Check content type to determine how to parse the request
     const contentType = request.headers.get('content-type');
     
-    let projectData: any;
+    let projectData: {
+      name: string;
+      climateZone: string;
+      squareFootage: number;
+      notes?: string;
+      sunExposure?: string;
+      designStyle?: string;
+      budget?: number;
+    };
     let imageFile: File | null = null;
     
     if (contentType?.includes('multipart/form-data')) {
